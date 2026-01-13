@@ -1,0 +1,311 @@
+drop table if exists zepto;
+
+create table zepto(
+sku_id SERIAL PRIMARY KEY,
+category VARCHAR(120),
+name VARCHAR(150) NOT NULL,
+mrp NUMERIC(8,2),
+discountPercent NUMERIC(5,2),
+availableQuantity INTEGER,
+discountedSellingPrice NUMERIC(8,2),
+weightInGms INTEGER,
+outOfStock BOOLEAN,
+quantity INTEGER
+);
+
+SELECT * FROM zepto;
+
+
+-- checking data
+
+Select COUNT(*) FROM zepto ;
+
+select * from zepto
+where name IS NULL 
+
+-- Explore
+
+select distinct category
+from zepto
+order by category;
+
+-- Products stock available
+
+select outOfStock, COUNT(sku_id)
+from zepto
+group by outOfStock;
+
+-- name present more than 1 
+
+select name , Count(sku_id)
+from zepto
+group by name
+having Count(sku_id)> 1
+order by Count(sku_id) desc;
+
+
+-- Data Cleaning ---
+
+-- Products with price 0
+
+Select * from zepto ;
+
+select * from zepto 
+where mrp = 0 
+or discountedSellingPrice = 0;
+
+delete from zepto
+where mrp = 0;
+
+-- convert rupes
+
+update zepto
+set mrp = mrp/100.0,
+discountedSellingPrice = discountedSellingPrice/100.0;
+
+Select mrp, discountedSellingPrice From zepto;
+
+
+select * from zepto;
+
+
+-- Business Insights
+
+--Q1
+--How many products are in the Zepto table?
+
+SELECT count(*)
+FROM zepto ;
+
+
+select
+    count(*)                as total_rows,
+    sum(case when mrp is null then 1 else 0 end) as null_mrp,
+    sum(case when discountedsellingprice is null then 1 else 0 end) as null_price,
+    min(mrp) as min_mrp,
+    max(mrp) as max_mrp,
+    sum(availablequantity) as total_stock
+from zepto;
+
+
+--Q2
+--How many products are out of stock?
+
+SELECT COUNT(*)
+FROM zepto
+WHERE availablequantity = 0;
+
+
+-- QUESTION 3 — EXPENSIVE PRODUCTS
+--How many products have MRP greater than ₹500?
+
+SELECT COUNT(*)
+FROM zepto
+WHERE mrp > 500;
+
+--QUESTION 4 — AVERAGE PRICE
+-- What is the average MRP of all products?
+
+SELECT ROUND(AVG(mrp),2)
+FROM zepto;
+
+--QUESTION 5 — MAX PRICE
+--Which product has the highest MRP, and what is that MRP?
+
+SELECT name, mrp
+FROM zepto
+ORDER BY mrp desc
+LIMIT 1;
+
+
+--QUESTION 6 — DISCOUNT LEADER
+--Which product has the highest discount percentage?
+
+SELECT name, discountPercent
+FROM zepto
+ORDER BY discountPercent desc
+LIMIT 1;
+
+
+--QUESTION 7 — UNATTRACTIVE EXPENSIVE PRODUCTS
+--Find how many products are:
+--MRP > ₹500, Discount < 5%
+
+SELECT COUNT(*)
+FROM zepto
+WHERE mrp > 500 AND discountpercent < 5;
+
+
+
+--QUESTION 8 — RUPEE DISCOUNT
+--What is the maximum rupee discount on any product?
+
+SELECT MAX(mrp - discountedsellingprice)
+FROM zepto;
+
+
+--QUESTION 9 — INVENTORY VALUE
+--For each product, calculate how much money is currently locked in inventory.
+
+SELECT 
+    name,
+    discountedsellingprice,
+    availablequantity,
+    (discountedsellingprice * availablequantity) AS inventory_value
+FROM zepto
+LIMIT 5 ;
+
+
+
+--QUESTION 10 — WHERE IS THE MONEY?
+--Which 5 products have the highest inventory value
+--(i.e., Zepto has the most money locked in them)?
+
+-- This query gives a some duplicate values also
+SELECT 
+    name,
+    (discountedsellingprice * availablequantity) AS inventory_value
+FROM zepto
+ORDER BY inventory_value DESC
+LIMIT 5 ;
+
+
+SELECT 
+    name,
+    SUM(discountedsellingprice * availablequantity) AS inventory_value
+FROM zepto
+GROUP BY name
+ORDER BY inventory_value DESC
+LIMIT 5;
+
+
+
+--QUESTION 11 — TOTAL BUSINESS RISK
+--How much total money is currently locked in all Zepto inventory?
+
+SELECT 
+    SUM(discountedsellingprice * availablequantity) AS inventory_value
+FROM zepto;
+
+
+
+--QUESTION 12 — DEAD MONEY
+--Which products are out of stock but were expensive (MRP > ₹500)?
+
+SELECT name, mrp
+FROM zepto
+WHERE availablequantity = 0
+  AND mrp > 500;
+
+
+--QUESTION 13 — SLOW-MOVING STOCK
+--Find products that:
+--Have high stock (availableQuantity > 50), But very low discount (discountPercent < 5)
+
+SELECT name, availableQuantity, discountPercent
+FROM zepto
+WHERE availableQuantity > 50  AND discountPercent < 5
+ORDER BY availableQuantity DESC ;
+
+
+
+--QUESTION 14 — PROMOTION CANDIDATES
+--Find products that should be pushed in ads:
+--High stock → availableQuantity > 30 , High discount → discountPercent > 20
+
+SELECT name, availableQuantity, discountPercent
+FROM zepto
+WHERE availableQuantity > 30  AND discountPercent > 20
+ORDER BY availableQuantity DESC ;
+
+
+--QUESTION 15 — WHAT SHOULD BE DISCOUNTED MORE
+--Now find products that:
+--Have high stock → availableQuantity > 30
+--But weak discount → discountPercent < 10
+
+SELECT name, availableQuantity, discountPercent
+FROM zepto
+WHERE availableQuantity > 30  AND discountPercent < 10
+ORDER BY availableQuantity DESC ;
+
+-----------------------------------------------------------------------------------------------------------
+---QUESTION 1 — REVENUE CONCENTRATION RISK
+--What percentage of total inventory value is held by the TOP 10 products?
+SELECT 
+    ROUND((top10.top_value / total.total_value) * 100, 2) AS concentration_percent
+FROM
+(
+    SELECT 
+        SUM(inventory_value) AS top_value
+    FROM
+    (
+        SELECT 
+            name,
+            SUM(discountedsellingprice * availablequantity) AS inventory_value
+        FROM zepto
+        GROUP BY name
+        ORDER BY inventory_value DESC
+        LIMIT 10
+    ) AS top10_products
+) AS top10,
+(
+    SELECT 
+        SUM(discountedsellingprice * availablequantity) AS total_value
+    FROM zepto
+) AS total;
+
+
+--QUESTION 2 — DISCOUNT SPEND INTELLIGENCE
+--Which 5 products are costing Zepto the most money in discounts?
+
+SELECT 
+	name,
+    SUM((mrp - discountedsellingprice) * availablequantity) AS total_discount_cost
+FROM zepto
+GROUP BY name
+ORDER BY total_discount_cost DESC
+LIMIT 5;
+
+
+--QUESTION 3 — OVERPRICED INVENTORY
+--Find products that are :
+--Expensive → discountedSellingPrice > ₹500
+--High stock → availableQuantity > 10
+--Weak discount → discountPercent < 5
+
+SELECT name, discountedSellingPrice, availableQuantity, discountPercent
+FROM zepto
+WHERE discountedSellingPrice > 500 AND  availableQuantity > 10  AND discountPercent < 5
+ORDER BY availableQuantity DESC ;
+
+
+--QUESTION 4 — CATEGORY POWER
+--Which 5 product categories hold the most total inventory value?
+--Where Zepto’s money is actually tied up
+--Which business verticals matter most
+
+
+SELECT 
+    category,
+    SUM(discountedsellingprice * availablequantity) AS total_inventory_value
+FROM zepto
+GROUP BY category
+ORDER BY total_inventory_value DESC
+LIMIT 5;
+
+
+
+--QUESTION 5 — STRATEGIC PRICE CUTS
+--Zepto can only discount 10 products.
+--Which 10 should be chosen to maximize immediate revenue increase?
+
+SELECT 
+    name,
+    SUM(discountedsellingprice * availablequantity * (100 - discountpercent)) AS priority_score
+FROM zepto
+GROUP BY name
+ORDER BY priority_score DESC
+LIMIT 10;
+
+
